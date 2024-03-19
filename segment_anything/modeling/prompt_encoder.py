@@ -125,6 +125,9 @@ class PromptEncoder(nn.Module):
     def _get_device(self) -> torch.device:
         return self.point_embeddings[0].weight.device
 
+    def _get_dtype(self) -> torch.dtype:
+        return self.point_embeddings[0].weight.dtype
+
     def forward(
         self,
         points: Optional[Tuple[torch.Tensor, torch.Tensor]],
@@ -149,7 +152,11 @@ class PromptEncoder(nn.Module):
             Bx(embed_dim)x(embed_H)x(embed_W)
         """
         bs = self._get_batch_size(points, boxes, masks)
-        sparse_embeddings = torch.empty((bs, 0, self.embed_dim), device=self._get_device())
+        sparse_embeddings = torch.empty(
+            (bs, 0, self.embed_dim), 
+            device=self._get_device(), 
+            dtype=self._get_dtype()
+        )
         if points is not None:
             coords, labels = points
             point_embeddings = self._embed_points(coords, labels, pad=(boxes is None))
@@ -195,7 +202,8 @@ class PositionEmbeddingRandom(nn.Module):
         """Generate positional encoding for a grid of the specified size."""
         h, w = size
         device: Any = self.positional_encoding_gaussian_matrix.device
-        grid = torch.ones((h, w), device=device, dtype=torch.float32)
+        dtype: Any = self.positional_encoding_gaussian_matrix.dtype
+        grid = torch.ones((h, w), device=device, dtype=dtype)
         y_embed = grid.cumsum(dim=0) - 0.5
         x_embed = grid.cumsum(dim=1) - 0.5
         y_embed = y_embed / h
@@ -211,4 +219,5 @@ class PositionEmbeddingRandom(nn.Module):
         coords = coords_input.clone()
         coords[:, :, 0] = coords[:, :, 0] / image_size[1]
         coords[:, :, 1] = coords[:, :, 1] / image_size[0]
-        return self._pe_encoding(coords.to(torch.float))  # B x N x C
+        dtype: Any = self.positional_encoding_gaussian_matrix.dtype
+        return self._pe_encoding(coords.to(dtype=dtype))  # B x N x C
